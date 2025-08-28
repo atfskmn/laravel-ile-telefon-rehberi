@@ -6,52 +6,18 @@ use App\Models\Department;
 use App\Models\Service;
 use App\Models\Position;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\PositionController;
 
-// Employees: list with filters and pagination
-Route::get('/employees', function (Request $request) {
-    $query = Employee::with(['department', 'service', 'position']);
-
-    if ($request->filled('department_id')) {
-        $query->where('department_id', $request->integer('department_id'));
-    }
-    if ($request->filled('service_id')) {
-        $query->where('service_id', $request->integer('service_id'));
-    }
-    if ($request->filled('position_id')) {
-        $query->where('position_id', $request->integer('position_id'));
-    }
-    if ($request->filled('is_active')) {
-        $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
-    }
-
-    if ($request->filled('q')) {
-        $q = $request->input('q');
-        $query->where(function ($sub) use ($q) {
-            $sub->where('first_name', 'like', "%$q%")
-                ->orWhere('last_name', 'like', "%$q%")
-                ->orWhere('email', 'like', "%$q%")
-                ->orWhere('phone', 'like', "%$q%")
-                ->orWhere('mobile', 'like', "%$q%")
-                ->orWhere('extension', 'like', "%$q%")
-                ->orWhere('employee_number', 'like', "%$q%");
-        });
-    }
-
-    $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
-    return $query->orderBy('last_name')->orderBy('first_name')
-        ->paginate($perPage)
-        ->appends($request->query());
-});
-
-// Employee detail
-Route::get('/employees/{id}', function (int $id) {
-    return Employee::with(['department', 'service', 'position'])->findOrFail($id);
-});
+// Employees: list and detail via controller
+Route::get('/employees', [EmployeeController::class, 'index']);
+Route::get('/employees/{id}', [EmployeeController::class, 'show']);
 
 // Departments
-Route::get('/departments', function () {
-    return Department::query()->where('is_active', true)->orderBy('name')->get();
-});
+Route::get('/departments', [DepartmentController::class, 'index']);
+Route::get('/departments/{id}', [DepartmentController::class, 'show']);
 Route::get('/departments/{id}/employees', function (int $id, Request $request) {
     $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
     return Employee::with(['department', 'service', 'position'])
@@ -61,9 +27,8 @@ Route::get('/departments/{id}/employees', function (int $id, Request $request) {
 });
 
 // Services
-Route::get('/services', function () {
-    return Service::query()->where('is_active', true)->orderBy('name')->get();
-});
+Route::get('/services', [ServiceController::class, 'index']);
+Route::get('/services/{id}', [ServiceController::class, 'show']);
 Route::get('/services/{id}/employees', function (int $id, Request $request) {
     $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
     return Employee::with(['department', 'service', 'position'])
@@ -73,8 +38,30 @@ Route::get('/services/{id}/employees', function (int $id, Request $request) {
 });
 
 // Positions
-Route::get('/positions', function () {
-    return Position::query()->where('is_active', true)->orderBy('title')->get();
+Route::get('/positions', [PositionController::class, 'index']);
+Route::get('/positions/{id}', [PositionController::class, 'show']);
+
+// Admin CRUD routes
+Route::prefix('admin')->group(function () {
+    // Employees
+    Route::post('/employees', [EmployeeController::class, 'store']);
+    Route::match(['put', 'patch'], '/employees/{id}', [EmployeeController::class, 'update']);
+    Route::delete('/employees/{id}', [EmployeeController::class, 'destroy']);
+
+    // Departments
+    Route::post('/departments', [DepartmentController::class, 'store']);
+    Route::match(['put', 'patch'], '/departments/{id}', [DepartmentController::class, 'update']);
+    Route::delete('/departments/{id}', [DepartmentController::class, 'destroy']);
+
+    // Services
+    Route::post('/services', [ServiceController::class, 'store']);
+    Route::match(['put', 'patch'], '/services/{id}', [ServiceController::class, 'update']);
+    Route::delete('/services/{id}', [ServiceController::class, 'destroy']);
+
+    // Positions
+    Route::post('/positions', [PositionController::class, 'store']);
+    Route::match(['put', 'patch'], '/positions/{id}', [PositionController::class, 'update']);
+    Route::delete('/positions/{id}', [PositionController::class, 'destroy']);
 });
 
 // Unified search endpoint
@@ -82,3 +69,4 @@ Route::get('/search', function (Request $request) {
     $request->merge(['q' => $request->input('q')]);
     return app()->handle(Request::create('/api/employees', 'GET', $request->query()));
 });
+
